@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: core-storage
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4400}:${PORT:-4400}"
+    env_file:
+      - .env
+    volumes:
+      - ${STORAGE_HOST_PATH:-./data/storage}:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - core-storage-net
+
+  db:
+    image: postgres:16-alpine
+    container_name: core-storage-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-corestorage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-corestorage_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-corestorage}
+    volumes:
+      - core-storage-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-corestorage}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - core-storage-net
+
+volumes:
+  core-storage-pgdata:
+
+networks:
+  core-storage-net:
+    driver: bridge

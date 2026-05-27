@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model System {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  apiKey    String   @unique @map("api_key")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  files File[]
+
+  @@map("systems")
+}
+
+model File {
+  id           String   @id @default(cuid())
+  originalName String   @map("original_name")
+  storedName   String   @map("stored_name")
+  mimeType     String   @map("mime_type")
+  size         BigInt
+  collection   String
+  subPath      String?  @map("sub_path")
+  fullPath     String   @map("full_path")
+  systemId     Int      @map("system_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  system System @relation(fields: [systemId], references: [id])
+
+  @@index([systemId, collection])
+  @@index([collection])
+  @@map("files")
+}
