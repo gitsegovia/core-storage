@@ -5,21 +5,16 @@ import { env } from '../../config/env';
 
 /**
  * Build the directory path for a file.
- * Structure: {STORAGE_PATH}/{systemSlug}/{collection}/{subPath?}/{YYYY}/{MM}
+ * Structure: {STORAGE_PATH}/{systemSlug}/{collection}/{subPath?}
  */
 export function buildDirectoryPath(
   systemSlug: string,
   collection: string,
   subPath?: string,
 ): string {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-
   const parts = [env.STORAGE_PATH, systemSlug, collection];
 
   if (subPath) {
-    // Sanitize: remove leading/trailing slashes, prevent path traversal
     const sanitized = subPath
       .split('/')
       .filter((seg) => seg && seg !== '.' && seg !== '..')
@@ -27,7 +22,6 @@ export function buildDirectoryPath(
     if (sanitized) parts.push(sanitized);
   }
 
-  parts.push(year, month);
   return path.join(...parts);
 }
 
@@ -40,10 +34,6 @@ export function buildRelativePath(
   fileName: string,
   subPath?: string,
 ): string {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-
   const parts = [systemSlug, collection];
 
   if (subPath) {
@@ -54,7 +44,7 @@ export function buildRelativePath(
     if (sanitized) parts.push(sanitized);
   }
 
-  parts.push(year, month, fileName);
+  parts.push(fileName);
   return parts.join('/');
 }
 
@@ -101,23 +91,20 @@ export async function getFileSize(absolutePath: string): Promise<number> {
 /**
  * Validate and sanitize a collection path.
  * Allows: letters, numbers, hyphens, underscores.
- * Allows slashes to define sub-collections (e.g. "invoices/2024/clients").
+ * Allows slashes to define sub-collections.
  */
 export function sanitizeCollection(collection: string): {
   collection: string;
   subPath?: string;
 } {
-  // Remove leading/trailing slashes
   const cleaned = collection.replace(/^\/+|\/+$/g, '');
 
   if (!cleaned) {
     throw new Error('Collection name cannot be empty');
   }
 
-  // Split by slash — first segment is the collection, rest is subPath
   const segments = cleaned.split('/').filter(Boolean);
 
-  // Validate each segment
   for (const seg of segments) {
     if (!/^[a-zA-Z0-9_-]+$/.test(seg)) {
       throw new Error(

@@ -1,4 +1,4 @@
-import Fastify, { FastifyError } from 'fastify';
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { env } from './config/env';
@@ -23,7 +23,7 @@ async function bootstrap() {
   });
 
   // ── Global error handler ──
-  app.setErrorHandler((error: FastifyError, request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send({
         error: error.name,

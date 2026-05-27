@@ -1,9 +1,12 @@
 import { FastifyInstance } from 'fastify';
+import { PrismaClient } from '@prisma/client';
 import { authenticateSystem } from '../auth/auth.middleware';
 import { fileListQuerySchema } from './files.schema';
 import * as filesService from './files.service';
 import { env } from '../../config/env';
-import { BadRequestError } from '../../shared/errors';
+import { BadRequestError, NotFoundError } from '../../shared/errors';
+
+const prisma = new PrismaClient();
 
 export async function filesRoutes(app: FastifyInstance) {
   // All routes require system auth
@@ -41,13 +44,53 @@ export async function filesRoutes(app: FastifyInstance) {
   });
 
   // GET /api/v1/files — List files with filters
-  app.get('/', async (request) => {
+  app.get('/files', async (request) => {
     const query = fileListQuerySchema.parse(request.query);
     return filesService.listFiles(request.system!.id, query);
   });
 
+  // GET /api/v1/files/lookup — Search file by name, collection, sub_path
+  app.get('/files/lookup', async (request, reply) => {
+    const { name, collection, sub_path } = request.query as {
+      name?: string;
+      collection?: string;
+      sub_path?: string;
+    };
+
+    if (!name) {
+      throw new BadRequestError('Parameter "name" is required');
+    }
+
+    const where: any = {
+      systemId: request.system!.id,
+      originalName: name,
+    };
+
+    if (collection) where.collection = collection;
+    if (sub_path) where.subPath = sub_path;
+
+    const file = await prisma.file.findFirst({ where });
+
+    if (!file) throw new NotFoundError('File');
+
+    return {
+      id: file.id,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: Number(file.size),
+      collection: file.collection,
+      subPath: file.subPath,
+      createdAt: file.createdAt,
+    };
+  });
+
+  // GET /api/v1/files/collections/list — List collections for this system
+  app.get('/files/collections/list', async (request) => {
+    return filesService.listCollections(request.system!.id);
+  });
+
   // GET /api/v1/files/:fileId — Download file
-  app.get<{ Params: { fileId: string } }>('/:fileId', async (request, reply) => {
+  app.get<{ Params: { fileId: string } }>('/files/:fileId', async (request, reply) => {
     const { stream, mimeType, originalName, size } = await filesService.downloadFile(
       request.params.fileId,
       request.system!.id,
@@ -61,17 +104,12 @@ export async function filesRoutes(app: FastifyInstance) {
   });
 
   // GET /api/v1/files/:fileId/info — File metadata
-  app.get<{ Params: { fileId: string } }>('/:fileId/info', async (request) => {
+  app.get<{ Params: { fileId: string } }>('/files/:fileId/info', async (request) => {
     return filesService.getFileInfo(request.params.fileId, request.system!.id);
   });
 
   // DELETE /api/v1/files/:fileId — Delete file
-  app.delete<{ Params: { fileId: string } }>('/:fileId', async (request) => {
+  app.delete<{ Params: { fileId: string } }>('/files/:fileId', async (request) => {
     return filesService.deleteFileRecord(request.params.fileId, request.system!.id);
-  });
-
-  // GET /api/v1/collections — List collections for this system
-  app.get('/collections/list', async (request) => {
-    return filesService.listCollections(request.system!.id);
   });
 }
